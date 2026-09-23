@@ -1,0 +1,42 @@
+version: "3.8"
+
+services:
+  # Model serving: image hasil build Kriteria 3 (mlflow build-docker), di-pull dari Docker Hub
+  model:
+    image: yogawicaksono/telco-churn-model:latest
+    container_name: telco_churn_model
+    ports:
+      - "8080:8080"
+
+  # Exporter: proxy di depan model serving + expose metrik Prometheus
+  exporter:
+    build:
+      context: .
+      dockerfile: Dockerfile.exporter
+    container_name: ml_exporter
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_SERVING_URL=http://model:8080/invocations
+    depends_on:
+      - model
+
+  # Prometheus: scrape metrik dari exporter
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - exporter
+
+  # Grafana: visualisasi & alerting dari Prometheus
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
